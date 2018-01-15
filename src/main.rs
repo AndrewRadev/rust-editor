@@ -4,9 +4,11 @@ use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 
+extern crate editor;
+use editor::ansi;
+
 use std::fs::File;
 use std::io::{self, Read, BufReader, BufRead, Write};
-use std::process;
 
 struct Buffer {
 
@@ -25,7 +27,7 @@ fn main() {
     let mut stdout = io::stdout().into_raw_mode().unwrap();
 
     loop {
-        render();
+        render(&mut stdout).unwrap();
 
         if !handle_input(&mut stdin, &mut stdout) {
             break;
@@ -33,16 +35,18 @@ fn main() {
     }
 }
 
-fn render() {
+fn render(mut stdout: &mut RawTerminal<io::Stdout>) -> io::Result<()> {
+    ansi::clear_screen(&mut stdout)?;
+    ansi::move_cursor(&mut stdout, 0, 0)?;
 
+    stdout.flush()
 }
 
 fn handle_input(stdin: &mut io::Stdin, stdout: &mut RawTerminal<io::Stdout>) -> bool {
     let c = stdin.keys().next().unwrap().unwrap();
 
     match c {
-        Key::Char('q') => return false,
-        Key::Ctrl('c') => return false,
+        Key::Ctrl('q') => return false,
         _              => write!(stdout, "Key pressed: {:?}\r\n", c),
     };
 

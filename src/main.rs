@@ -17,7 +17,7 @@ struct Cursor {
 }
 
 fn main() {
-    let file = File::open("test.txt").unwrap();
+    let file = File::open("test.txt").expect("Couldn't open file!");
     let reader = BufReader::new(file);
     let lines = reader.lines().collect::<Result<Vec<_>, _>>().unwrap();
 
@@ -27,7 +27,9 @@ fn main() {
     loop {
         render();
 
-        handle_input(&mut stdin, &mut stdout);
+        if !handle_input(&mut stdin, &mut stdout) {
+            break;
+        }
     }
 }
 
@@ -35,14 +37,15 @@ fn render() {
 
 }
 
-fn handle_input(stdin: &mut io::Stdin, stdout: &mut RawTerminal<io::Stdout>) {
+fn handle_input(stdin: &mut io::Stdin, stdout: &mut RawTerminal<io::Stdout>) -> bool {
     let c = stdin.keys().next().unwrap().unwrap();
 
     match c {
-        Key::Char('q') => process::exit(0),
-        Key::Ctrl('c') => process::exit(0),
-        _              => write!(stdout, "Key pressed: {:?}", c),
+        Key::Char('q') => return false,
+        Key::Ctrl('c') => return false,
+        _              => write!(stdout, "Key pressed: {:?}\r\n", c),
     };
 
     stdout.flush().unwrap();
+    true
 }

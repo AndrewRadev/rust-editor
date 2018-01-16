@@ -31,6 +31,24 @@ struct Cursor {
     col: u16,
 }
 
+impl Cursor {
+    pub fn up(&self) -> Self {
+        Self { row: self.row - 1, col: self.col }
+    }
+
+    pub fn down(&self) -> Self {
+        Self { row: self.row + 1, col: self.col }
+    }
+
+    pub fn left(&self) -> Self {
+        Self { row: self.row, col: self.col - 1 }
+    }
+
+    pub fn right(&self) -> Self {
+        Self { row: self.row, col: self.col + 1 }
+    }
+}
+
 struct Editor {
     stdout: RawTerminal<io::Stdout>,
     buffer: Buffer,
@@ -62,14 +80,13 @@ impl Editor {
 
         match c {
             Key::Ctrl('q') => return Ok(false),
-            Key::Left      => return Ok(false),
-            Key::Right     => return Ok(false),
-            Key::Up        => return Ok(false),
-            Key::Down      => return Ok(false),
+            Key::Up        => self.cursor = self.cursor.up(),
+            Key::Down      => self.cursor = self.cursor.down(),
+            Key::Left      => self.cursor = self.cursor.left(),
+            Key::Right     => self.cursor = self.cursor.right(),
             _              => write!(self.stdout, "Key pressed: {:?}\r\n", c)?,
         };
 
-        self.stdout.flush().unwrap();
         Ok(true)
     }
 
@@ -82,7 +99,7 @@ impl Editor {
     }
 
     fn reset_cursor(&mut self) -> io::Result<()> {
-        write!(self.stdout, "{}", cursor::Goto(self.cursor.row + 1, self.cursor.col + 1))
+        write!(self.stdout, "{}", cursor::Goto(self.cursor.col + 1, self.cursor.row + 1))
     }
 }
 

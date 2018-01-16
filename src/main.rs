@@ -3,70 +3,102 @@ extern crate termion;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
-
-extern crate editor;
-use editor::ansi;
+use termion::clear;
+use termion::cursor;
 
 use std::fs::File;
-use std::io::{self, Read, BufReader, BufRead, Write};
+use std::io::{self, BufReader, BufRead, Write};
 
 struct Buffer {
-    stdout: RawTerminal<io::Stdout>,
     lines: Vec<String>,
 }
 
 impl Buffer {
-    fn new(lines: Vec<String>, stdout: RawTerminal<io::Stdout>) -> Self {
-        Buffer { lines, stdout }
+    fn new(lines: Vec<String>) -> Self {
+        Buffer { lines }
     }
 
-    fn render(&mut self) -> io::Result<()> {
+    fn render(&mut self, stdout: &mut RawTerminal<io::Stdout>) -> io::Result<()> {
         for line in self.lines.iter() {
-            write!(self.stdout, "{}\r\n", line)?;
+            write!(stdout, "{}\r\n", line)?;
         }
         Ok(())
     }
 }
 
 struct Cursor {
+    row: u16,
+    col: u16,
+}
 
+struct Editor {
+    stdout: RawTerminal<io::Stdout>,
+    buffer: Buffer,
+    cursor: Cursor,
+}
+
+impl Editor {
+    pub fn new(lines: Vec<String>) -> Self {
+        let stdout = io::stdout().into_raw_mode().unwrap();
+
+        let buffer = Buffer::new(lines);
+        let cursor = Cursor { row: 0, col: 0 };
+
+        Self { stdout, buffer, cursor }
+    }
+
+    pub fn render(&mut self) -> io::Result<()> {
+        self.clear_screen()?;
+
+        self.move_cursor(0, 0)?;
+        self.buffer.render(&mut self.stdout).unwrap();
+        self.reset_cursor()?;
+
+        self.stdout.flush()
+    }
+
+    pub fn handle_input(&mut self, stdin: &mut io::Stdin) -> io::Result<bool> {
+        let c = stdin.keys().next().unwrap().unwrap();
+
+        match c {
+            Key::Ctrl('q') => return Ok(false),
+            Key::Left      => return Ok(false),
+            Key::Right     => return Ok(false),
+            Key::Up        => return Ok(false),
+            Key::Down      => return Ok(false),
+            _              => write!(self.stdout, "Key pressed: {:?}\r\n", c)?,
+        };
+
+        self.stdout.flush().unwrap();
+        Ok(true)
+    }
+
+    fn clear_screen(&mut self) -> io::Result<()> {
+        write!(self.stdout, "{}", clear::All)
+    }
+
+    fn move_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
+        write!(self.stdout, "{}", cursor::Goto(x + 1, y + 1))
+    }
+
+    fn reset_cursor(&mut self) -> io::Result<()> {
+        write!(self.stdout, "{}", cursor::Goto(self.cursor.row + 1, self.cursor.col + 1))
+    }
 }
 
 fn main() {
     let file = File::open("test.txt").expect("Couldn't open file!");
     let reader = BufReader::new(file);
     let lines = reader.lines().collect::<Result<Vec<_>, _>>().unwrap();
-
     let mut stdin = io::stdin();
-    let mut stdout = io::stdout().into_raw_mode().unwrap();
 
-    let mut buffer = Buffer::new(lines, io::stdout().into_raw_mode().unwrap());
+    let mut editor = Editor::new(lines);
 
     loop {
-        render(&mut stdout).unwrap();
-        buffer.render().unwrap();
+        editor.render().unwrap();
 
-        if !handle_input(&mut stdin, &mut stdout) {
+        if !editor.handle_input(&mut stdin).unwrap() {
             break;
         }
     }
-}
-
-fn render(mut stdout: &mut RawTerminal<io::Stdout>) -> io::Result<()> {
-    ansi::clear_screen(&mut stdout)?;
-    ansi::move_cursor(&mut stdout, 0, 0)?;
-
-    stdout.flush()
-}
-
-fn handle_input(stdin: &mut io::Stdin, stdout: &mut RawTerminal<io::Stdout>) -> bool {
-    let c = stdin.keys().next().unwrap().unwrap();
-
-    match c {
-        Key::Ctrl('q') => return false,
-        _              => write!(stdout, "Key pressed: {:?}\r\n", c),
-    };
-
-    stdout.flush().unwrap();
-    true
 }

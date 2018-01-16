@@ -40,21 +40,25 @@ struct Cursor {
 }
 
 impl Cursor {
-    pub fn up(&self) -> Self {
+    pub fn up(&self, buffer: &Buffer) -> Self {
+        let new_row = self.row.saturating_sub(1);
+
         Self {
-            row: self.row.saturating_sub(1),
-            col: self.col,
+            row: new_row,
+            col: Self::clamp(self.col, buffer.line_length(new_row).saturating_sub(1)),
         }
     }
 
     pub fn down(&self, buffer: &Buffer) -> Self {
+        let new_row = Self::clamp(self.row + 1, buffer.line_count().saturating_sub(1));
+
         Self {
-            row: Self::clamp_inc(self.row, buffer.line_count() - 1),
-            col: self.col,
+            row: new_row,
+            col: Self::clamp(self.col, buffer.line_length(new_row).saturating_sub(1)),
         }
     }
 
-    pub fn left(&self) -> Self {
+    pub fn left(&self, _buffer: &Buffer) -> Self {
         Self {
             row: self.row,
             col: self.col.saturating_sub(1),
@@ -64,17 +68,15 @@ impl Cursor {
     pub fn right(&self, buffer: &Buffer) -> Self {
         Self {
             row: self.row,
-            col: Self::clamp_inc(self.col, buffer.line_length(self.row) - 1)
+            col: Self::clamp(self.col + 1, buffer.line_length(self.row).saturating_sub(1))
         }
     }
 
-    fn clamp_inc(n: u16, limit: u16) -> u16 {
-        let result = n.saturating_add(1);
-
-        if result > limit {
+    fn clamp(n: u16, limit: u16) -> u16 {
+        if n > limit {
             limit
         } else {
-            result
+            n
         }
     }
 }
@@ -110,9 +112,10 @@ impl Editor {
 
         match c {
             Key::Ctrl('q') => return Ok(false),
-            Key::Up        => self.cursor = self.cursor.up(),
+            Key::Ctrl('c') => return Ok(false),
+            Key::Up        => self.cursor = self.cursor.up(&self.buffer),
             Key::Down      => self.cursor = self.cursor.down(&self.buffer),
-            Key::Left      => self.cursor = self.cursor.left(),
+            Key::Left      => self.cursor = self.cursor.left(&self.buffer),
             Key::Right     => self.cursor = self.cursor.right(&self.buffer),
             _              => write!(self.stdout, "Key pressed: {:?}\r\n", c)?,
         };

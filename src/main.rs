@@ -104,8 +104,6 @@ impl Editor {
     }
 
     pub fn render(&mut self) -> io::Result<()> {
-        self.clear_screen()?;
-
         self.move_cursor(0, 0)?;
         self.buffer.render(&mut self.stdout).unwrap();
         self.reset_cursor()?;
@@ -151,6 +149,7 @@ fn main() {
     let mut stdin = io::stdin();
 
     let mut editor = Editor::new(lines);
+    editor.clear_screen().unwrap();
 
     loop {
         editor.render().unwrap();

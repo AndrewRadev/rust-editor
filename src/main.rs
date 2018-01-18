@@ -144,9 +144,11 @@ impl Editor {
                 self.clear_screen()?;
             },
             Key::Backspace => {
-                self.buffer = self.buffer.delete(self.cursor.row, self.cursor.col.saturating_sub(1));
-                self.cursor = self.cursor.left(&self.buffer);
-                self.clear_screen()?;
+                if self.cursor.col > 0 {
+                    self.buffer = self.buffer.delete(self.cursor.row, self.cursor.col.saturating_sub(1));
+                    self.cursor = self.cursor.left(&self.buffer);
+                    self.clear_screen()?;
+                }
             },
             Key::Char(c)   => {
                 self.buffer = self.buffer.insert(c, self.cursor.row, self.cursor.col);

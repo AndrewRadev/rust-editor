@@ -32,6 +32,12 @@ impl Buffer {
     pub fn line_length(&self, row: u16) -> u16 {
         self.lines.get(row as usize).map(String::len).unwrap_or(0) as u16
     }
+
+    pub fn insert(&self, c: char, row: u16, col: u16) -> Self {
+        let mut lines = self.lines.clone();
+        lines.get_mut(row as usize).map(|row| row.insert(col as usize, c));
+        Self { lines }
+    }
 }
 
 struct Cursor {
@@ -108,16 +114,18 @@ impl Editor {
     }
 
     pub fn handle_input(&mut self, stdin: &mut io::Stdin) -> io::Result<bool> {
-        let c = stdin.keys().next().unwrap().unwrap();
-
-        match c {
+        match stdin.keys().next().unwrap().unwrap() {
             Key::Ctrl('q') => return Ok(false),
             Key::Ctrl('c') => return Ok(false),
             Key::Up        => self.cursor = self.cursor.up(&self.buffer),
             Key::Down      => self.cursor = self.cursor.down(&self.buffer),
             Key::Left      => self.cursor = self.cursor.left(&self.buffer),
             Key::Right     => self.cursor = self.cursor.right(&self.buffer),
-            _              => write!(self.stdout, "Key pressed: {:?}\r\n", c)?,
+            Key::Char(c)   => {
+                self.buffer = self.buffer.insert(c, self.cursor.row, self.cursor.col);
+                self.cursor = self.cursor.right(&self.buffer);
+            },
+            _              => (),
         };
 
         Ok(true)

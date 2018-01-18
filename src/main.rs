@@ -9,6 +9,7 @@ use termion::cursor;
 use std::fs::File;
 use std::io::{self, BufReader, BufRead, Write};
 
+#[derive(Clone)]
 struct Buffer {
     lines: Vec<String>,
 }
@@ -59,6 +60,7 @@ impl Buffer {
     }
 }
 
+#[derive(Clone)]
 struct Cursor {
     row: u16,
     col: u16,
@@ -110,6 +112,7 @@ struct Editor {
     stdout: RawTerminal<io::Stdout>,
     buffer: Buffer,
     cursor: Cursor,
+    history: Vec<(Buffer, Cursor)>,
 }
 
 impl Editor {
@@ -119,7 +122,7 @@ impl Editor {
         let buffer = Buffer::new(lines);
         let cursor = Cursor { row: 0, col: 0 };
 
-        Self { stdout, buffer, cursor }
+        Self { stdout, buffer, cursor, history: Vec::new() }
     }
 
     pub fn render(&mut self) -> io::Result<()> {
@@ -134,30 +137,48 @@ impl Editor {
         match stdin.keys().next().unwrap().unwrap() {
             Key::Ctrl('q') => return Ok(false),
             Key::Ctrl('c') => return Ok(false),
+            Key::Ctrl('z') => {
+                self.restore_snapshot();
+                self.clear_screen()?;
+            }
             Key::Up        => self.cursor = self.cursor.up(&self.buffer),
             Key::Down      => self.cursor = self.cursor.down(&self.buffer),
             Key::Left      => self.cursor = self.cursor.left(&self.buffer),
             Key::Right     => self.cursor = self.cursor.right(&self.buffer),
             Key::Char('\n') => {
+                self.save_snapshot();
                 self.buffer = self.buffer.split_line(self.cursor.row, self.cursor.col);
                 self.cursor = Cursor { row: self.cursor.row + 1, col: 0 };
                 self.clear_screen()?;
             },
             Key::Backspace => {
                 if self.cursor.col > 0 {
+                    self.save_snapshot();
                     self.buffer = self.buffer.delete(self.cursor.row, self.cursor.col.saturating_sub(1));
                     self.cursor = self.cursor.left(&self.buffer);
                     self.clear_screen()?;
                 }
             },
             Key::Char(c)   => {
+                self.save_snapshot();
                 self.buffer = self.buffer.insert(c, self.cursor.row, self.cursor.col);
                 self.cursor = self.cursor.right(&self.buffer);
             },
-            _              => (),
+            _ => (),
         };
 
         Ok(true)
+    }
+
+    pub fn save_snapshot(&mut self) {
+        self.history.push((self.buffer.clone(), self.cursor.clone()));
+    }
+
+    pub fn restore_snapshot(&mut self) {
+        if let Some((buffer, cursor)) = self.history.pop() {
+            self.buffer = buffer;
+            self.cursor = cursor;
+        }
     }
 
     fn clear_screen(&mut self) -> io::Result<()> {

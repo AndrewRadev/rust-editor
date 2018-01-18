@@ -44,6 +44,19 @@ impl Buffer {
         lines.get_mut(row as usize).map(|row| if (col as usize) < row.len() { row.remove(col as usize); });
         Self { lines }
     }
+
+    pub fn split_line(&self, row: u16, col: u16) -> Self {
+        let (lines_above, lines_below) = self.lines.split_at(row as usize);
+        let (line_before, line_after) = lines_below[0].split_at(col as usize);
+
+        let mut lines = Vec::with_capacity(self.lines.len() + 1);
+        lines.extend_from_slice(lines_above);
+        lines.push(line_before.to_string());
+        lines.push(line_after.to_string());
+        lines.extend_from_slice(&lines_below[1..]);
+
+        Self { lines }
+    }
 }
 
 struct Cursor {
@@ -125,6 +138,11 @@ impl Editor {
             Key::Down      => self.cursor = self.cursor.down(&self.buffer),
             Key::Left      => self.cursor = self.cursor.left(&self.buffer),
             Key::Right     => self.cursor = self.cursor.right(&self.buffer),
+            Key::Char('\n') => {
+                self.buffer = self.buffer.split_line(self.cursor.row, self.cursor.col);
+                self.cursor = Cursor { row: self.cursor.row + 1, col: 0 };
+                self.clear_screen()?;
+            },
             Key::Backspace => {
                 self.buffer = self.buffer.delete(self.cursor.row, self.cursor.col.saturating_sub(1));
                 self.cursor = self.cursor.left(&self.buffer);

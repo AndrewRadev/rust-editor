@@ -38,6 +38,12 @@ impl Buffer {
         lines.get_mut(row as usize).map(|row| row.insert(col as usize, c));
         Self { lines }
     }
+
+    pub fn delete(&self, row: u16, col: u16) -> Self {
+        let mut lines = self.lines.clone();
+        lines.get_mut(row as usize).map(|row| if (col as usize) < row.len() { row.remove(col as usize); });
+        Self { lines }
+    }
 }
 
 struct Cursor {
@@ -74,7 +80,7 @@ impl Cursor {
     pub fn right(&self, buffer: &Buffer) -> Self {
         Self {
             row: self.row,
-            col: Self::clamp(self.col + 1, buffer.line_length(self.row).saturating_sub(1))
+            col: Self::clamp(self.col + 1, buffer.line_length(self.row))
         }
     }
 
@@ -119,6 +125,11 @@ impl Editor {
             Key::Down      => self.cursor = self.cursor.down(&self.buffer),
             Key::Left      => self.cursor = self.cursor.left(&self.buffer),
             Key::Right     => self.cursor = self.cursor.right(&self.buffer),
+            Key::Backspace => {
+                self.buffer = self.buffer.delete(self.cursor.row, self.cursor.col.saturating_sub(1));
+                self.cursor = self.cursor.left(&self.buffer);
+                self.clear_screen()?;
+            },
             Key::Char(c)   => {
                 self.buffer = self.buffer.insert(c, self.cursor.row, self.cursor.col);
                 self.cursor = self.cursor.right(&self.buffer);
